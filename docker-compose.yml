@@ -1,0 +1,107 @@
+services:
+  # API Gateway
+  gateway:
+    build:
+      context: .
+      dockerfile: apps/backend/gateway/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/learning_coach
+      - VECTOR_STORE=chromadb
+      - CHROMA_PERSIST_DIR=/data/chromadb
+    env_file:
+      - .env
+    depends_on:
+      - db
+    volumes:
+      - chromadb_data:/data/chromadb
+
+  # Core Agent Service
+  core-agent:
+    build:
+      context: .
+      dockerfile: apps/backend/core-agent/Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/learning_coach
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+  # RAG Worker Service
+  rag-worker:
+    build:
+      context: .
+      dockerfile: apps/backend/rag-worker/Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/learning_coach
+      - VECTOR_STORE=chromadb
+      - CHROMA_PERSIST_DIR=/data/chromadb
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+      - PINECONE_ENVIRONMENT=${PINECONE_ENVIRONMENT}
+      - PINECONE_INDEX=${PINECONE_INDEX}
+    env_file:
+      - .env
+    depends_on:
+      - db
+    volumes:
+      - chromadb_data:/data/chromadb
+
+  # Evaluator Service
+  evaluator:
+    build:
+      context: .
+      dockerfile: apps/backend/evaluator/Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/learning_coach
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+  # Notification Worker
+  notification-worker:
+    build:
+      context: .
+      dockerfile: apps/backend/notification-worker/Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/learning_coach
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=learning_coach
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  # Angular Frontend
+  web:
+    build:
+      context: apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "4200:80"
+    depends_on:
+      - gateway
+
+volumes:
+  postgres_data:
+  chromadb_data:
