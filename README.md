@@ -8,10 +8,6 @@ An AI-driven microservices platform designed to create personalized learning pat
 
 ---
 
-## 🗺️ Documentation Map
-
-- **[System Overview](SYSTEM_OVERVIEW.md)**: Technical architecture, project structure, and detailed service descriptions.
-
 ---
 
 ## 🏗️ High-Level Architecture
