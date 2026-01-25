@@ -171,6 +171,9 @@ class CheckinService:
                 "motivation_note": "Keep up the momentum!",
             }
         
+        # Determine advice content
+        advice_text = llm_response.get("blocker_advice") or llm_response.get("motivation_note")
+
         # Save check-in
         checkin = Checkin(
             user_id=user_id,
@@ -180,6 +183,7 @@ class CheckinService:
             blockers=blockers,
             next_task=llm_response.get("next_task"),
             fallback_task=llm_response.get("fallback_task"),
+            advice=advice_text,
         )
         self.db.add(checkin)
         self.db.commit()
@@ -208,6 +212,7 @@ class CheckinService:
         
         return AgentDecision(
             reason=llm_response.get("assessment", "Check-in processed"),
+            advice=advice_text,
             signals=Signals(
                 adherence=adherence,
                 knowledge=0.5,

@@ -9,6 +9,8 @@ COPY apps/backend/core-agent/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY apps/backend/core-agent/app/ ./app/
+COPY alembic.ini .
+COPY migrations/ ./migrations/
 
 EXPOSE 8001
 

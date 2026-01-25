@@ -36,7 +36,10 @@ Previous risks identified:
 Memory rules (patterns to consider):
 {memory_rules}
 
-Create a weekly learning plan with 5-7 tasks. Each task should be:
+Create a weekly learning plan.
+- Distribute tasks across all 7 days (Monday-Sunday) to build a consistent habit.
+- Do NOT skip weekends unless weekly hours are very low (<5h).
+- Each task should be:
 - Specific and actionable
 - Timeboxed (20, 45, or 90 minutes)
 - Tagged as reading, coding, or review

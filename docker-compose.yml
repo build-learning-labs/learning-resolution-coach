@@ -10,6 +10,10 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/learning_coach
       - VECTOR_STORE=chromadb
       - CHROMA_PERSIST_DIR=/data/chromadb
+      - CORE_AGENT_URL=http://core-agent:8001
+      - RAG_WORKER_URL=http://rag-worker:8002
+      - EVALUATOR_URL=http://evaluator:8003
+      - NOTIFICATION_URL=http://notification-worker:8004
     env_file:
       - .env
     depends_on:

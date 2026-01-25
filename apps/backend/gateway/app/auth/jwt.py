@@ -3,31 +3,35 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from pydantic import BaseModel
 
 from app.core.config import settings
 
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-class TokenData(BaseModel):
-    """JWT token payload data."""
-    
-    user_id: int
-    email: str
-    exp: datetime
-
-
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against a hashed password."""
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8"), hashed_password.encode("utf-8")
+        )
+    except Exception:
+        return False
 
 
 def get_password_hash(password: str) -> str:
     """Hash a password using bcrypt."""
-    return pwd_context.hash(password)
+    # Bcrypt has a 72-byte limit, but it's only a problem if we don't truncate or hash first.
+    # For standard passwords, 72 bytes is plenty.
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+class TokenData(BaseModel):
+    """JWT token payload data."""
+
+    user_id: int
+    email: str
+    exp: datetime
 
 
 def create_access_token(

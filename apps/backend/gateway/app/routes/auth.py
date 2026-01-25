@@ -22,6 +22,7 @@ from app.auth import (
     get_or_create_oauth_user,
     google_oauth,
 )
+from app.auth.dependencies import get_current_user
 from app.core.config import settings
 
 
@@ -177,13 +178,8 @@ async def forgot_password(
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user(
-    # In production, extract from Authorization header
-    # For now, this is a placeholder
+async def get_current_user_info(
+    current_user: User = Depends(get_current_user),
 ):
-    """Get current authenticated user."""
-    # TODO: Implement proper authentication dependency
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Not authenticated",
-    )
+    """Get current authenticated user info."""
+    return current_user

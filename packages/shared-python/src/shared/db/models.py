@@ -213,6 +213,7 @@ class Checkin(Base):
     # Agent response
     next_task: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     fallback_task: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    advice: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

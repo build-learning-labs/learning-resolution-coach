@@ -22,6 +22,9 @@ SERVICE_URLS = {
 
 async def get_current_user_id(request: Request) -> int:
     """Extract and validate user ID from Authorization header."""
+    if request.method == "OPTIONS":
+        return 0
+    
     auth_header = request.headers.get("Authorization")
     
     if not auth_header or not auth_header.startswith("Bearer "):
@@ -43,6 +46,10 @@ async def proxy_request(
     user_id: int,
 ):
     """Proxy request to backend service."""
+    if request.method == "OPTIONS":
+        from fastapi.responses import Response
+        return Response(status_code=200)
+
     if service not in SERVICE_URLS:
         raise HTTPException(status_code=404, detail=f"Service '{service}' not found")
     
@@ -84,10 +91,11 @@ async def proxy_request(
 # Agent service routes
 @router.api_route("/v1/intake", methods=["POST"])
 @router.api_route("/v1/premortem", methods=["POST"])
-@router.api_route("/v1/plan/{path:path}", methods=["GET", "POST"])
-@router.api_route("/v1/tasks/{path:path}", methods=["GET", "POST", "PUT"])
-@router.api_route("/v1/checkin/{path:path}", methods=["GET", "POST"])
-@router.api_route("/v1/metrics/{path:path}", methods=["GET"])
+@router.api_route("/v1/plan/{path:path}", methods=["GET", "POST", "OPTIONS"])
+@router.api_route("/v1/commitment/{path:path}", methods=["GET", "OPTIONS"])
+@router.api_route("/v1/tasks/{path:path}", methods=["GET", "POST", "PUT", "OPTIONS"])
+@router.api_route("/v1/checkin/{path:path}", methods=["GET", "POST", "OPTIONS"])
+@router.api_route("/v1/metrics/{path:path}", methods=["GET", "OPTIONS"])
 async def agent_proxy(
     request: Request,
     user_id: int = Depends(get_current_user_id),

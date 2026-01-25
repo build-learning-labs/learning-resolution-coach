@@ -9,9 +9,6 @@ from sqlalchemy import pool
 
 from alembic import context
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'packages', 'shared-python', 'src'))
-
 from shared.db.base import Base
 from shared.db import models  # noqa: F401 - Import all models
 

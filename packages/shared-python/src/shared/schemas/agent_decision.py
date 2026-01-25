@@ -64,6 +64,7 @@ class AgentDecision(BaseModel):
     """
     
     reason: str = Field(description="Explanation of the decision")
+    advice: Optional[str] = Field(default=None, description="Specific advice or feedback")
     signals: Signals = Field(description="Current status signals")
     action: Action = Field(
         default_factory=Action,
