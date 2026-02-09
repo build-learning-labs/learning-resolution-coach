@@ -1,5 +1,7 @@
 fastapi>=0.95.2
 uvicorn[standard]>=0.27.0
 httpx>=0.26.0
+google-generativeai
+opik
 
 -e ../../packages/shared-python

@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 
 
 class RetrievalService:
-    """Service for retrieving relevant resources."""
+    """Service for retrieving relevant resources with enhanced RAG capabilities."""
     
     def __init__(self, db: Session, vector_store: Optional[VectorStore] = None):
         self.db = db
@@ -27,33 +27,35 @@ class RetrievalService:
                 collection_name=settings.CHROMA_COLLECTION,
                 persist_directory=settings.CHROMA_PERSIST_DIR,
             )
-        # Add Pinecone, Qdrant support here as needed
         return ChromaDBStore(collection_name=settings.CHROMA_COLLECTION)
+
+    def _split_text(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
+        """Split text into overlapping chunks for better embedding accuracy."""
+        if not text:
+            return []
+        return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size-overlap)]
     
     async def retrieve(
         self,
         query: str,
         top_k: int = 5,
         topic: Optional[str] = None,
+        difficulty: Optional[str] = None, # Added difficulty filter
         checkin_id: Optional[int] = None,
     ) -> Dict:
-        """Retrieve relevant resources for a query.
-        
-        Args:
-            query: Search query
-            top_k: Number of results to return
-            topic: Optional topic filter
-            checkin_id: Optional check-in ID to associate with retrieval
-            
-        Returns:
-            Dictionary with results and citations
-        """
+        """Retrieve relevant resources for a query."""
         logger.info("Retrieving resources", query=query[:50], top_k=top_k)
         
         # Build filters
-        filters = None
+        filters = {}
         if topic:
-            filters = {"topic": topic}
+            filters["topic"] = topic
+        if difficulty:
+            filters["difficulty"] = difficulty
+            
+        # Handle empty filters for ChromaDB (it expects None if empty)
+        if not filters:
+            filters = None
         
         # Search vector store
         try:
@@ -73,7 +75,7 @@ class RetrievalService:
         for result in results:
             formatted_results.append({
                 "id": result.id,
-                "content": result.content[:500],  # Truncate for response
+                "content": result.content,  # FIX: Removed [:500] limit
                 "score": result.score,
                 "metadata": result.metadata,
             })
@@ -110,19 +112,7 @@ class RetrievalService:
         resource_type: Optional[str] = None,
         difficulty: Optional[str] = None,
     ) -> Resource:
-        """Ingest a new resource into the system.
-        
-        Args:
-            title: Resource title
-            url: Resource URL
-            content: Full content text
-            topic: Topic/category
-            resource_type: Type (course, docs, blog, etc.)
-            difficulty: Difficulty level
-            
-        Returns:
-            Created Resource record
-        """
+        """Ingest a new resource into the system with chunking."""
         logger.info("Ingesting resource", title=title, topic=topic)
         
         # Create content hash for deduplication
@@ -137,7 +127,7 @@ class RetrievalService:
             logger.info("Resource already exists", id=existing.id)
             return existing
         
-        # Create resource record
+        # Create resource record (SQL)
         resource = Resource(
             title=title,
             url=url,
@@ -151,21 +141,30 @@ class RetrievalService:
         self.db.commit()
         self.db.refresh(resource)
         
-        # Add to vector store
-        metadata = {
-            "title": title,
-            "url": url,
-            "topic": topic,
-            "resource_type": resource_type or "",
-            "difficulty": difficulty or "",
-            "resource_id": str(resource.id),
-        }
+        # Chunking Logic
+        chunks = self._split_text(content)
+        chunk_metadatas = []
+        chunk_ids = []
         
+        for i, _ in enumerate(chunks):
+            # Metadata for each chunk
+            chunk_metadatas.append({
+                "title": title,
+                "url": url,
+                "topic": topic,
+                "resource_type": resource_type or "",
+                "difficulty": difficulty or "",
+                "resource_id": str(resource.id),
+                "chunk_index": i
+            })
+            chunk_ids.append(f"{resource.id}_{i}")
+
+        # Add chunks to vector store
         try:
             await self.vector_store.add_documents(
-                documents=[content],
-                metadatas=[metadata],
-                ids=[str(resource.id)],
+                documents=chunks,
+                metadatas=chunk_metadatas,
+                ids=chunk_ids,
             )
         except Exception as e:
             logger.error("Failed to add to vector store", error=str(e))
@@ -179,10 +178,8 @@ class RetrievalService:
     ) -> List[Resource]:
         """Get resources, optionally filtered by topic."""
         query = self.db.query(Resource)
-        
         if topic:
             query = query.filter(Resource.topic == topic)
-        
         return query.limit(limit).all()
     
     async def get_vector_store_count(self) -> int:

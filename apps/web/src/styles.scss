@@ -1,12 +1,19 @@
-// Angular Material Theme
+// 1. @use MUST be the very first rule
 @use '@angular/material' as mat;
+
+// 2. Tailwind directives come next
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+// 3. Angular Material Core
 @include mat.core();
 
-// Use Indigo-Pink theme (matches our primary purple/indigo colors)
+// 4. Other Imports
 @import '@angular/material/prebuilt-themes/indigo-pink.css';
-
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+// 5. Global Styles & Variables
 :root {
   --primary: #4f46e5;
   --primary-hover: #4338ca;
@@ -33,12 +40,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h1, h2, h3, h4, h5, h6 {
   color: #0f172a;
   font-weight: 700;
 }
@@ -47,7 +49,7 @@ h6 {
   min-height: 100vh;
 }
 
-/* Common Components */
+// Common Components
 .btn-primary {
   background: var(--primary);
   color: white;
