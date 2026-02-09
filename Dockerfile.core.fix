@@ -1,0 +1,24 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# 1. Copy shared package
+COPY packages/shared-python /packages/shared-python
+
+# 2. Copy requirements
+COPY apps/backend/core-agent/requirements.txt .
+
+# 3. FIX: Remove broken line & install manually
+RUN sed -i '/shared-python/d' requirements.txt && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir /packages/shared-python
+
+# 4. Copy app code
+COPY apps/backend/core-agent/app/ ./app/
+COPY alembic.ini .
+COPY migrations/ ./migrations/
+
+# 5. CRITICAL: This must be 8001
+EXPOSE 8001
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]

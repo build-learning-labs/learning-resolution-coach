@@ -1,33 +1,42 @@
-"""OpenAI LLM provider implementation."""
+"""Gemini LLM provider implementation (Replacing OpenAI for Hackathon)."""
 
 import json
+import os
 from typing import AsyncGenerator, Any, Optional
-from openai import AsyncOpenAI
+import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from shared.llm.base import LLMProvider, LLMResponse
 
-
 class OpenAIProvider(LLMProvider):
-    """OpenAI API provider (GPT-4, GPT-4o, etc.)."""
+    """
+    NOTE: This class is named OpenAIProvider to maintain compatibility 
+    with the existing Factory logic, but it uses Google Gemini internally.
+    """
 
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "gpt-4o",
+        model: str = "gemini-1.5-flash",
         base_url: Optional[str] = None,
     ):
-        """Initialize OpenAI provider.
-        
-        Args:
-            api_key: OpenAI API key (or from OPENAI_API_KEY env var)
-            model: Model to use (default: gpt-4o)
-            base_url: Optional custom base URL for API-compatible endpoints
-        """
-        self.model = model
-        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        """Initialize Gemini provider."""
+        # Prioritize Google API Key from Env if not passed directly
+        self.api_key = api_key or os.getenv("GOOGLE_API_KEY")
+        if not self.api_key:
+            # Fallback: Try to grab OpenAI key if user forgot to set Google one
+            self.api_key = os.getenv("OPENAI_API_KEY")
+
+        genai.configure(api_key=self.api_key)
+
+        # Ensure we are using a valid Gemini model name
+        if "gpt" in model:
+            self.model_name = "gemini-1.5-flash"
+        else:
+            self.model_name = model
 
     @property
     def provider_name(self) -> str:
-        return "openai"
+        return "google"
 
     async def complete(
         self,
@@ -37,33 +46,42 @@ class OpenAIProvider(LLMProvider):
         max_tokens: int = 1024,
         **kwargs: Any,
     ) -> LLMResponse:
-        messages = []
-        
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        
-        messages.append({"role": "user", "content": prompt})
-        
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
+
+        # Configure the model
+        generation_config = genai.types.GenerationConfig(
             temperature=temperature,
-            max_tokens=max_tokens,
-            **kwargs,
+            max_output_tokens=max_tokens,
         )
-        
-        choice = response.choices[0]
-        
-        return LLMResponse(
-            content=choice.message.content or "",
-            model=response.model,
-            usage={
-                "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
-                "completion_tokens": response.usage.completion_tokens if response.usage else 0,
-                "total_tokens": response.usage.total_tokens if response.usage else 0,
-            },
-            finish_reason=choice.finish_reason,
+
+        # Initialize model with system prompt if present
+        model = genai.GenerativeModel(
+            model_name=self.model_name,
+            system_instruction=system_prompt if system_prompt else None
         )
+
+        # Generate
+        try:
+            response = await model.generate_content_async(
+                prompt,
+                generation_config=generation_config
+            )
+
+            content = response.text
+
+            return LLMResponse(
+                content=content,
+                model=self.model_name,
+                usage={
+                    "prompt_tokens": 0, # Gemini doesn't always return token counts easily
+                    "completion_tokens": 0,
+                    "total_tokens": 0,
+                },
+                finish_reason="stop",
+            )
+        except Exception as e:
+            # Fallback for safety blocks or errors
+            print(f"Gemini Error: {e}")
+            return LLMResponse(content=f"Error: {str(e)}", model=self.model_name)
 
     async def stream(
         self,
@@ -73,25 +91,26 @@ class OpenAIProvider(LLMProvider):
         max_tokens: int = 1024,
         **kwargs: Any,
     ) -> AsyncGenerator[str, None]:
-        messages = []
-        
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        
-        messages.append({"role": "user", "content": prompt})
-        
-        stream = await self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
+
+        generation_config = genai.types.GenerationConfig(
             temperature=temperature,
-            max_tokens=max_tokens,
-            stream=True,
-            **kwargs,
+            max_output_tokens=max_tokens,
         )
-        
-        async for chunk in stream:
-            if chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+
+        model = genai.GenerativeModel(
+            model_name=self.model_name,
+            system_instruction=system_prompt
+        )
+
+        response_stream = await model.generate_content_async(
+            prompt,
+            generation_config=generation_config,
+            stream=True
+        )
+
+        async for chunk in response_stream:
+            if chunk.text:
+                yield chunk.text
 
     async def structured_output(
         self,
@@ -101,48 +120,27 @@ class OpenAIProvider(LLMProvider):
         temperature: float = 0.3,
         **kwargs: Any,
     ) -> dict:
-        messages = []
-        
-        schema_instruction = (
-            f"Respond with valid JSON matching this schema:\n"
-            f"```json\n{json.dumps(schema, indent=2)}\n```\n"
-            f"Only output the JSON, no other text."
+
+        # Gemini JSON Mode
+        generation_config = genai.types.GenerationConfig(
+            temperature=temperature,
+            response_mime_type="application/json"
         )
-        
-        full_system = schema_instruction
-        if system_prompt:
-            full_system = f"{system_prompt}\n\n{schema_instruction}"
-        
-        messages.append({"role": "system", "content": full_system})
-        messages.append({"role": "user", "content": prompt})
-        
-        # Try using response_format if available (GPT-4o and newer)
+
+        # Add schema hint to system prompt
+        schema_text = json.dumps(schema)
+        full_system_prompt = f"{system_prompt or ''}\n\nFollow this JSON schema:\n{schema_text}"
+
+        model = genai.GenerativeModel(
+            model_name=self.model_name,
+            system_instruction=full_system_prompt
+        )
+
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=temperature,
-                response_format={"type": "json_object"},
-                **kwargs,
+            response = await model.generate_content_async(
+                prompt,
+                generation_config=generation_config
             )
-            content = response.choices[0].message.content or "{}"
-            return json.loads(content)
+            return json.loads(response.text)
         except Exception:
-            # Fallback for older models
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=temperature,
-                **kwargs,
-            )
-            content = response.choices[0].message.content or "{}"
-            # Try to extract JSON from response
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                # Try to find JSON in the response
-                import re
-                json_match = re.search(r'\{.*\}', content, re.DOTALL)
-                if json_match:
-                    return json.loads(json_match.group())
-                raise ValueError(f"Could not parse JSON from response: {content}")
+            return {}

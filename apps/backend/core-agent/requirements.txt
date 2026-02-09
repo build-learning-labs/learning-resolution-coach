@@ -6,3 +6,4 @@ httpx>=0.26.0
 
 # Install shared package
 -e ../../packages/shared-python
+google-generativeai

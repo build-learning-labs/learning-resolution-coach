@@ -30,6 +30,12 @@ services:
       - "8001:8001"
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/learning_coach
+      - OPIK_API_KEY=${OPIK_API_KEY}        # <--- MUST BE HERE
+      - OPIK_WORKSPACE=${OPIK_WORKSPACE}    # <--- MUST BE HERE
+      - OPIK_PROJECT=${OPIK_PROJECT}  # <--- ADD THIS LINE
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent      # <--- ADD THIS
+      - OPENAI_MODEL_NAME=gemini-1.5-flash  # <--- ADD THIS
     env_file:
       - .env
     depends_on:
@@ -65,6 +71,12 @@ services:
       - "8003:8003"
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/learning_coach
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - OPIK_API_KEY=${OPIK_API_KEY}
+      - OPIK_WORKSPACE=${OPIK_WORKSPACE}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     env_file:
       - .env
     depends_on:

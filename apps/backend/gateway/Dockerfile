@@ -2,20 +2,22 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy shared package first
+# 1. Copy the shared package to a fixed location
 COPY packages/shared-python /packages/shared-python
 
-# Install dependencies
+# 2. Copy requirements
 COPY apps/backend/gateway/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# 3. FIX: Remove the broken relative path line & install shared package manually
+RUN sed -i '/shared-python/d' requirements.txt && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir /packages/shared-python
+
+# 4. Copy the rest of the app
 COPY apps/backend/gateway/app/ ./app/
 COPY migrations/ ./migrations/
 COPY alembic.ini .
 
-# Expose port
 EXPOSE 8000
 
-# Run the application
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
